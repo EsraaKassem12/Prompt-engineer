@@ -100,7 +100,7 @@
   </div>
   <dialog id="promptDialog"><form class="modal" id="promptForm"><div class="modal-head"><h2>New prompt</h2><button class="close" type="button" id="closeDialog" aria-label="Close">×</button></div><label for="title">Name</label><input id="title" required placeholder="e.g. Landing page ideas"><label for="content">Prompt</label><textarea id="content" required placeholder="Write your prompt here..."></textarea><div class="modal-row"><div><label for="category">Collection</label><select id="category"><option>Writing</option><option>Coding</option><option>Marketing</option></select></div><div><label for="newTag">Tag</label><input id="newTag" placeholder="e.g. Brainstorming"></div></div><div class="modal-actions"><button class="secondary" type="button" id="cancelDialog">Cancel</button><button class="primary" type="submit">Save prompt</button></div></form></dialog>
   <script>
-    const prompts = [
+    const defaultPrompts = [
       { title: 'Turn notes into an outline', content: 'Transform these raw notes into a clear, logical outline. Identify the main argument, supporting points, and any gaps worth exploring.', category: 'Writing', tag: 'Structure', color: '', favorite: true },
       { title: 'Explain like I\'m five', content: 'Explain the following complex concept in simple language using a relatable analogy. Avoid jargon, but keep the explanation accurate.', category: 'Writing', tag: 'Clarity', color: 'blue', favorite: false },
       { title: 'Refactor this function', content: 'Review this function for readability, performance, and edge cases. Suggest a refactored version and briefly explain each meaningful change.', category: 'Coding', tag: 'Development', color: 'green', favorite: true },
@@ -109,11 +109,18 @@
       { title: 'Five unexpected angles', content: 'Give me five fresh, non-obvious angles for this topic. For each one, include the audience insight that makes it interesting.', category: 'Marketing', tag: 'Ideation', color: 'purple', favorite: false },
       { title: 'Polish this draft', content: 'Improve the clarity and rhythm of this draft while preserving my voice. Call out any sentence where the meaning is ambiguous.', category: 'Writing', tag: 'Editing', color: '', favorite: false }
     ];
-    const categories = ['Writing', 'Coding', 'Marketing'];
+    const savedPrompts = localStorage.getItem('prompt-manager-prompts');
+    const savedCategories = localStorage.getItem('prompt-manager-categories');
+    const prompts = savedPrompts ? JSON.parse(savedPrompts) : defaultPrompts;
+    const categories = savedCategories ? JSON.parse(savedCategories) : ['Writing', 'Coding', 'Marketing'];
     const cards = document.querySelector('#cards');
     const search = document.querySelector('#search');
     const filter = document.querySelector('#filter');
     let view = 'all';
+    function saveData() {
+      localStorage.setItem('prompt-manager-prompts', JSON.stringify(prompts));
+      localStorage.setItem('prompt-manager-categories', JSON.stringify(categories));
+    }
     function renderCategories() {
       document.querySelector('#categoryList').innerHTML = categories.map(category => `<button class="collection" data-category="${category}"><span class="dot"></span> ${category} <span class="count">${prompts.filter(prompt => prompt.category === category).length}</span></button>`).join('');
       filter.innerHTML = '<option value="all">All categories</option>' + categories.map(category => `<option>${category}</option>`).join('');
@@ -130,15 +137,16 @@
       document.querySelector('#favCount').textContent = prompts.filter(prompt => prompt.favorite).length;
       cards.innerHTML = visible.length ? visible.map(prompt => `<article class="card"><div class="card-top"><span class="tag ${prompt.color}">${prompt.tag}</span><button class="star ${prompt.favorite ? 'saved' : ''}" data-star="${prompts.indexOf(prompt)}" aria-label="${prompt.favorite ? 'Remove from favorites' : 'Add to favorites'}">${prompt.favorite ? '★' : '☆'}</button></div><h3>${prompt.title}</h3><p>${prompt.content}</p><div class="card-footer"><span>${prompt.category}</span><div class="card-actions"><button class="text-button" data-copy="${prompts.indexOf(prompt)}">Copy prompt</button></div></div></article>`).join('') : '<div class="empty">No prompts match your search.</div>';
     }
-    cards.addEventListener('click', event => { const star = event.target.closest('[data-star]'); const copy = event.target.closest('[data-copy]'); if (star) { prompts[star.dataset.star].favorite = !prompts[star.dataset.star].favorite; render(); } if (copy) { navigator.clipboard.writeText(prompts[copy.dataset.copy].content); copy.textContent = 'Copied'; setTimeout(() => copy.textContent = 'Copy prompt', 1200); } });
+    cards.addEventListener('click', event => { const star = event.target.closest('[data-star]'); const copy = event.target.closest('[data-copy]'); if (star) { prompts[star.dataset.star].favorite = !prompts[star.dataset.star].favorite; saveData(); render(); } if (copy) { navigator.clipboard.writeText(prompts[copy.dataset.copy].content); copy.textContent = 'Copied'; setTimeout(() => copy.textContent = 'Copy prompt', 1200); } });
     search.addEventListener('input', render); filter.addEventListener('change', render);
     document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { view = button.dataset.view; document.querySelectorAll('[data-view]').forEach(item => item.classList.remove('active')); button.classList.add('active'); document.querySelector('h1').textContent = view === 'favorites' ? 'Favorites' : 'All prompts'; render(); }));
     const dialog = document.querySelector('#promptDialog');
     document.querySelector('#newPrompt').addEventListener('click', () => dialog.showModal());
     document.querySelector('#closeDialog').addEventListener('click', () => dialog.close());
     document.querySelector('#cancelDialog').addEventListener('click', () => dialog.close());
-    document.querySelector('#promptForm').addEventListener('submit', event => { event.preventDefault(); const title = document.querySelector('#title').value; prompts.unshift({ title, content: document.querySelector('#content').value, category: document.querySelector('#category').value, tag: document.querySelector('#newTag').value || 'New', color: '', favorite: false }); event.target.reset(); dialog.close(); filter.value = 'all'; view = 'all'; document.querySelector('h1').textContent = 'All prompts'; document.querySelectorAll('[data-view]').forEach(item => item.classList.toggle('active', item.dataset.view === 'all')); render(); });
-    document.querySelector('#addCollection').addEventListener('click', () => { const name = prompt('Category name:'); if (!name) return; const category = name.trim(); if (!category || categories.some(item => item.toLowerCase() === category.toLowerCase())) return; categories.push(category); renderCategories(); filter.value = category; view = 'all'; document.querySelector('h1').textContent = category; render(); });
+    document.querySelector('#promptForm').addEventListener('submit', event => { event.preventDefault(); const title = document.querySelector('#title').value; prompts.unshift({ title, content: document.querySelector('#content').value, category: document.querySelector('#category').value, tag: document.querySelector('#newTag').value || 'New', color: '', favorite: false }); saveData(); event.target.reset(); dialog.close(); filter.value = 'all'; view = 'all'; document.querySelector('h1').textContent = 'All prompts'; document.querySelectorAll('[data-view]').forEach(item => item.classList.toggle('active', item.dataset.view === 'all')); renderCategories(); render(); });
+    document.querySelector('#addCollection').addEventListener('click', () => { const name = prompt('Category name:'); if (!name) return; const category = name.trim(); if (!category || categories.some(item => item.toLowerCase() === category.toLowerCase())) return; categories.push(category); saveData(); renderCategories(); filter.value = category; view = 'all'; document.querySelector('h1').textContent = category; render(); });
+    saveData();
     renderCategories();
     render();
   </script>
